@@ -8,3 +8,4 @@ __pycache__/
 .DS_Store
 streamlit.log
 streamlit.err
+sample_invoice.png

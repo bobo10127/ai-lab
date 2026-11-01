@@ -64,6 +64,14 @@ def extract_invoice(text: str, client: OpenAI) -> dict:
     return json.loads(content)
 
 
+def extract_from_image(image_path: str | Path, client: OpenAI) -> tuple[dict, str]:
+    """图片 -> OCR 文字 -> 结构化字段，返回 (record, ocr_text)。"""
+    from ocr import image_to_text
+
+    text = image_to_text(image_path)
+    return extract_invoice(text, client), text
+
+
 def validate(record: dict) -> list[str]:
     """本地规则校验，返回错误列表；空列表表示通过。"""
     errors = []

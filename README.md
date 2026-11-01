@@ -4,8 +4,15 @@
 
 ## 环境
 
-- Python 3.12（虚拟环境在 `.venv/`）
+- Python 3.12
+- 虚拟环境在 `E:\ai-lab-venv`（C 盘空间紧张，依赖都放 E 盘）
 - VS Code + Python 扩展
+
+激活虚拟环境：
+
+```powershell
+E:\ai-lab-venv\Scripts\Activate.ps1
+```
 
 ## 快速开始
 
@@ -69,11 +76,28 @@ streamlit run app.py
 
 浏览器打开 http://localhost:8501 ，粘贴发票文字、点「提取」，就能看到金额、类别、日期和 JSON 结果。侧边栏有「填入一条示例」按钮，方便快速试用。
 
+## 项目 1.6：图片识别（OCR）
+
+上传发票图片，先本地 OCR，再交给模型提取。
+
+```powershell
+streamlit run app.py   # 用「上传图片」标签页
+```
+
+OCR 引擎是 **RapidOCR**（ONNX 版 PP-OCR 模型）：纯本地、免费、不用联网，模型随包安装，不需要额外下载几十 GB。
+
+命令行也能单独测试：
+
+```powershell
+python make_sample.py               # 生成一张编造的发票图片
+python ocr.py sample_invoice.png    # 看看 OCR 认出了什么
+```
+
 ## 下一步
 
 - [x] 跑通 `demo_similarity.py`
 - [x] 申请 DeepSeek API Key，跑通 `hello_ai.py`
 - [x] 做第一个小工具：发票信息提取（v1，文本输入）
 - [x] 加 Streamlit 界面
-- [ ] 发票 v2：接入 OCR，直接读图片
+- [x] 发票 v2：接入 OCR，直接读图片
 - [ ] 做一个 RAG：报销制度问答
