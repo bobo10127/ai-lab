@@ -59,11 +59,21 @@ python invoice_extractor.py --file a.txt     # 从文件读取
 
 设计要点：模型只负责抽取，校验交给本地代码；示例数据全部是编的，不涉及真实发票。
 
+## 项目 1.5：Web 界面（Streamlit）
+
+把命令行工具变成网页。
+
+```powershell
+streamlit run app.py
+```
+
+浏览器打开 http://localhost:8501 ，粘贴发票文字、点「提取」，就能看到金额、类别、日期和 JSON 结果。侧边栏有「填入一条示例」按钮，方便快速试用。
+
 ## 下一步
 
 - [x] 跑通 `demo_similarity.py`
 - [x] 申请 DeepSeek API Key，跑通 `hello_ai.py`
 - [x] 做第一个小工具：发票信息提取（v1，文本输入）
+- [x] 加 Streamlit 界面
 - [ ] 发票 v2：接入 OCR，直接读图片
-- [ ] 加 Streamlit 界面
 - [ ] 做一个 RAG：报销制度问答
