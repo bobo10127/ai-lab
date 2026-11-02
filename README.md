@@ -93,6 +93,22 @@ python make_sample.py               # 生成一张编造的发票图片
 python ocr.py sample_invoice.png    # 看看 OCR 认出了什么
 ```
 
+## 项目 2：制度问答（RAG）
+
+把 `docs/报销制度.md` 切成块，检索最相关的几段，再让模型「看着材料回答」，并标注出处。
+
+```powershell
+streamlit run app.py   # 用「制度问答」标签页
+```
+
+原理：
+
+- **切块**：按标题、段落把长文档拆成小段，方便精准检索；
+- **检索**：把问题和每段都变成词频向量，用余弦相似度找 top-3；
+- **生成**：把检索到的片段塞进 prompt，要求模型只依据片段回答，并标注 `[1] [2]`。
+
+这里用 TF-IDF 而不是向量数据库，是为了零依赖、能离线跑。以后想升级成真正的语义检索，只要把检索部分换成 embedding + 向量库即可。
+
 ## 下一步
 
 - [x] 跑通 `demo_similarity.py`
@@ -100,4 +116,7 @@ python ocr.py sample_invoice.png    # 看看 OCR 认出了什么
 - [x] 做第一个小工具：发票信息提取（v1，文本输入）
 - [x] 加 Streamlit 界面
 - [x] 发票 v2：接入 OCR，直接读图片
-- [ ] 做一个 RAG：报销制度问答
+- [x] 做一个 RAG：报销制度问答
+- [ ] 把检索升级成 embedding（语义检索）
+- [ ] 支持 PDF / Excel 导出
+- [ ] 部署上线

@@ -19,6 +19,7 @@ from invoice_extractor import (
     get_client,
     validate,
 )
+from rag import answer_question
 
 st.set_page_config(page_title="大肥鱼发票助手", page_icon="🐟", layout="centered")
 
@@ -58,12 +59,13 @@ with st.sidebar:
     st.markdown(
         "**文本**：粘贴发票文字直接提取\n\n"
         "**图片**：上传发票照片，先 OCR 再接提取\n\n"
+        "**问答**：问报销制度，回答会标注出处\n\n"
         "示例数据全部是编的，不涉及真实发票。"
     )
     if st.button("填入一条示例", use_container_width=True):
         st.session_state["invoice_text"] = DEMO_TEXTS[0]
 
-tab_text, tab_image = st.tabs(["📝 文本输入", "🖼️ 上传图片"])
+tab_text, tab_image, tab_rag = st.tabs(["📝 文本输入", "🖼️ 上传图片", "📚 制度问答"])
 
 with tab_text:
     if "invoice_text" not in st.session_state:
@@ -110,3 +112,28 @@ with tab_image:
                     with st.expander("OCR 识别原文", expanded=False):
                         st.text(ocr_text)
                     render_record(record)
+
+with tab_rag:
+    st.caption("基于 `docs/报销制度.md` 的本地检索 + 大模型回答，回答会标注出处。")
+
+    question = st.text_input(
+        "问一个报销制度问题",
+        placeholder="例如：出差住宿标准是多少？",
+    )
+
+    if st.button("提问", type="primary"):
+        if not question.strip():
+            st.warning("先输入一个问题。")
+        else:
+            with st.spinner("检索并回答中..."):
+                try:
+                    answer, sources = answer_question(question, cached_client())
+                except Exception as exc:
+                    st.error(f"回答失败：{exc}")
+                else:
+                    st.markdown(answer)
+                    if sources:
+                        with st.expander("查看引用片段"):
+                            for i, s in enumerate(sources, 1):
+                                st.markdown(f"**[{i}] {s['title']}**")
+                                st.caption(s["text"][:300])
