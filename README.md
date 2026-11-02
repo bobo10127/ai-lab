@@ -34,13 +34,21 @@ python hello_ai.py
 
 ```text
 ai-lab/
-├── .venv/               # 虚拟环境（不提交）
-├── .env.example         # 环境变量模板
+├── assets/bg.jpg          # 界面背景（代码生成）
+├── docs/报销制度.md        # RAG 用的虚构制度文档
+├── .env.example           # 环境变量模板
 ├── .gitignore
 ├── README.md
 ├── requirements.txt
-├── demo_similarity.py   # 零依赖：余弦相似度演示
-└── hello_ai.py          # 调用 DeepSeek 的最小示例
+├── demo_similarity.py     # 零依赖：余弦相似度演示
+├── hello_ai.py            # 调用 DeepSeek 的最小示例
+├── invoice_extractor.py   # 发票文本 -> 结构化 JSON + 规则校验
+├── ocr.py                 # 图片 -> 文字（RapidOCR）
+├── rag.py                 # 切块 + 向量检索 + 带出处的回答
+├── export.py              # 记录 -> Excel / PDF
+├── make_sample.py         # 生成一张假发票图片
+├── make_background.py     # 生成背景图
+└── app.py                 # Streamlit 界面
 ```
 
 ## 项目 1：发票信息提取（v1）
@@ -119,6 +127,33 @@ streamlit run app.py
 
 实测「住店能报多少钱？」这个问题：TF-IDF 一条都检索不到（字面没有重合），embedding 能准确命中「差旅费」——这就是语义检索的价值。
 
+## 项目 3：导出 Excel / PDF
+
+提取过的发票会攒进「📊 汇总导出」清单，一次性导出成表，不用一张张往 Excel 里抄。
+
+```powershell
+python export.py   # 用内置示例直接生成 sample_export.xlsx / .pdf
+```
+
+两种格式各有用途：
+
+| | Excel | PDF |
+|---|---|---|
+| 给谁 | 财务 | 自己归档、打印 |
+| 特点 | 能改、能加行、能透视 | 排版固定、字体内嵌、不会被误改 |
+| 合计 | `=SUM()` 公式，改明细自动更新 | 固定数值 |
+
+实现要点：
+
+- 全用代码生成，不依赖 Office 软件，服务器上没装 Excel 也能跑；
+- **Excel**：openpyxl 写单元格样式、数字格式（`#,##0.00`）、冻结表头、横向打印一页宽；
+- **PDF**：reportlab 排版，中文字体注册 Windows 自带字体（微软雅黑/黑体/宋体），字体会子集化内嵌，文件只有几十 KB；
+- 两个函数都只吃 `list[dict]`、返回 `bytes`，Streamlit 的 `download_button` 直接就能用，不落地临时文件。
+
+PDF 里的「合计」行原本用白色字压在浅色底上，几乎看不见——第一次渲染出来才发现，改成深色就好了。**生成的东西一定要自己打开看一眼**。
+
+![导出的 PDF 示例](assets/export_preview.png)
+
 ## 界面
 
 背景图由 `make_background.py` 用代码生成（抽象海洋，无版权问题），再以 base64 注入 CSS，不依赖任何外部图片链接。
@@ -136,5 +171,5 @@ python make_background.py   # 重新生成 assets/bg.jpg
 - [x] 发票 v2：接入 OCR，直接读图片
 - [x] 做一个 RAG：报销制度问答
 - [x] 把检索升级成 embedding（语义检索）
-- [ ] 支持 PDF / Excel 导出
+- [x] 支持 PDF / Excel 导出
 - [ ] 部署上线

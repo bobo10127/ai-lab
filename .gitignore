@@ -9,3 +9,6 @@ __pycache__/
 streamlit.log
 streamlit.err
 sample_invoice.png
+sample_export.xlsx
+sample_export.pdf
+_preview/
