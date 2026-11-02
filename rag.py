@@ -1,20 +1,30 @@
-"""最小可用的 RAG：制度文档问答。
+"""RAG：制度文档问答，支持两种检索方式。
 
-流程：
-    切块 -> 建索引（TF-IDF + 中文字符二元组）-> 检索 top-k -> 拼进 prompt -> 模型回答并标注出处
+- embedding：语义检索（默认）。用 bge-small-zh 把句子变成向量，能理解“换个说法”。
+- tfidf：关键词检索（旧方案）。零依赖、可离线，但只认字面。
 
-不依赖向量数据库、embedding API 或任何模型下载，纯本地、可离线运行。
-以后想升级成真正的向量检索，只需要替换 TfidfIndex 的 search 部分。
+切换方式：
+    set RAG_INDEX=tfidf     # Windows 命令行
+    $env:RAG_INDEX="tfidf"  # PowerShell
+
+流程：切块 -> 建索引 -> 检索 top-k -> 拼进 prompt -> 模型回答并标注出处。
 """
 
 import math
+import os
 import re
 from collections import Counter
 from pathlib import Path
 
+# 必须在导入 sentence_transformers 之前设置，模型才会从国内镜像下载、并缓存到 E 盘
+os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
+os.environ.setdefault("HF_HOME", r"E:\hf-cache")
+
 from openai import OpenAI
 
 DOCS_DIR = Path(__file__).with_name("docs")
+EMBED_MODEL = "BAAI/bge-small-zh-v1.5"
+QUERY_PREFIX = "为这个句子生成表示以用于检索相关文章："
 
 SYSTEM_PROMPT = """你是公司报销制度助手。请严格根据下面提供的制度片段回答问题。
 
@@ -34,16 +44,10 @@ def split_markdown(text: str, source: str) -> list[dict]:
     parts = re.split(r"\n(?=## )", text)
     chunks = []
     for part in parts:
-        part = part.strip()
-        if not part or part.startswith("# "):
-            # 跳过纯一级标题（文档开头）
-            body = part
-        else:
-            body = part
+        body = part.strip()
         if not body:
             continue
         title = body.splitlines()[0].lstrip("#").strip()
-        # 太长的段落再拆
         if len(body) <= 500:
             chunks.append({"source": source, "title": title, "text": body})
         else:
@@ -72,11 +76,13 @@ def tokenize(text: str) -> list[str]:
 
 
 class TfidfIndex:
+    """关键词检索：TF-IDF + 余弦相似度。"""
+
+    name = "tfidf"
+
     def __init__(self, docs: list[dict]):
         self.docs = docs
-        self.counters = [
-            Counter(tokenize(d["title"] + " " + d["text"])) for d in docs
-        ]
+        self.counters = [Counter(tokenize(d["title"] + " " + d["text"])) for d in docs]
         df = Counter()
         for c in self.counters:
             df.update(set(c))
@@ -99,13 +105,46 @@ class TfidfIndex:
         return [(s, self.docs[i]) for s, i in scored[:k] if s > 0]
 
 
+class EmbeddingIndex:
+    """语义检索：bge-small-zh 向量 + 余弦相似度。"""
+
+    name = "embedding"
+
+    def __init__(self, docs: list[dict]):
+        from sentence_transformers import SentenceTransformer
+
+        self.docs = docs
+        self.model = SentenceTransformer(EMBED_MODEL)
+        texts = [d["title"] + "\n" + d["text"] for d in docs]
+        self.embeddings = self.model.encode(
+            texts, normalize_embeddings=True, show_progress_bar=False
+        )
+
+    def search(self, query: str, k: int = 3) -> list[tuple[float, dict]]:
+        q = self.model.encode(
+            [QUERY_PREFIX + query], normalize_embeddings=True, show_progress_bar=False
+        )[0]
+        scored = [(float(vec @ q), i) for i, vec in enumerate(self.embeddings)]
+        scored.sort(reverse=True)
+        return [(s, self.docs[i]) for s, i in scored[:k]]
+
+
 _index = None
 
 
-def get_index() -> TfidfIndex:
+def get_index():
     global _index
     if _index is None:
-        _index = TfidfIndex(load_chunks())
+        kind = os.getenv("RAG_INDEX", "embedding").lower()
+        docs = load_chunks()
+        if kind == "tfidf":
+            _index = TfidfIndex(docs)
+        else:
+            try:
+                _index = EmbeddingIndex(docs)
+            except Exception as exc:  # 模型下载失败等，自动退回关键词检索
+                print(f"[warn] embedding 初始化失败，回退 tfidf: {exc}")
+                _index = TfidfIndex(docs)
     return _index
 
 
@@ -137,8 +176,10 @@ if __name__ == "__main__":
     from invoice_extractor import get_client
 
     q = " ".join(sys.argv[1:]) or "出差住宿标准是多少？"
-    ans, sources = answer_question(q, get_client())
+    idx = get_index()
+    print(f"检索方式：{idx.name}")
     print("问题：", q)
+    ans, sources = answer_question(q, get_client())
     print("回答：", ans)
     print("\n引用：")
     for i, s in enumerate(sources, 1):

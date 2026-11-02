@@ -6,6 +6,7 @@
 
 - Python 3.12
 - 虚拟环境在 `E:\ai-lab-venv`（C 盘空间紧张，依赖都放 E 盘）
+- Embedding 模型缓存：`E:\hf-cache`
 - VS Code + Python 扩展
 
 激活虚拟环境：
@@ -107,7 +108,24 @@ streamlit run app.py   # 用「制度问答」标签页
 - **检索**：把问题和每段都变成词频向量，用余弦相似度找 top-3；
 - **生成**：把检索到的片段塞进 prompt，要求模型只依据片段回答，并标注 `[1] [2]`。
 
-这里用 TF-IDF 而不是向量数据库，是为了零依赖、能离线跑。以后想升级成真正的语义检索，只要把检索部分换成 embedding + 向量库即可。
+默认用 **embedding 语义检索**：`BAAI/bge-small-zh-v1.5` 把问题和每个片段编码成向量，用余弦相似度找最相关的 3 段。它能理解「住店能报多少钱」和「住宿标准」说的是同一件事。
+
+模型首次运行会从 hf-mirror 下载（约 95MB），缓存在 `E:\hf-cache`。想对比关键词检索，可以切回 TF-IDF：
+
+```powershell
+$env:RAG_INDEX="tfidf"
+streamlit run app.py
+```
+
+实测「住店能报多少钱？」这个问题：TF-IDF 一条都检索不到（字面没有重合），embedding 能准确命中「差旅费」——这就是语义检索的价值。
+
+## 界面
+
+背景图由 `make_background.py` 用代码生成（抽象海洋，无版权问题），再以 base64 注入 CSS，不依赖任何外部图片链接。
+
+```powershell
+python make_background.py   # 重新生成 assets/bg.jpg
+```
 
 ## 下一步
 
@@ -117,6 +135,6 @@ streamlit run app.py   # 用「制度问答」标签页
 - [x] 加 Streamlit 界面
 - [x] 发票 v2：接入 OCR，直接读图片
 - [x] 做一个 RAG：报销制度问答
-- [ ] 把检索升级成 embedding（语义检索）
+- [x] 把检索升级成 embedding（语义检索）
 - [ ] 支持 PDF / Excel 导出
 - [ ] 部署上线

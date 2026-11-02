@@ -6,6 +6,7 @@
 浏览器打开 http://localhost:8501
 """
 
+import base64
 import json
 import tempfile
 from pathlib import Path
@@ -22,6 +23,44 @@ from invoice_extractor import (
 from rag import answer_question
 
 st.set_page_config(page_title="大肥鱼发票助手", page_icon="🐟", layout="centered")
+
+BG_PATH = Path(__file__).with_name("assets") / "bg.jpg"
+
+
+def inject_background() -> None:
+    """把本地背景图以 base64 方式注入 CSS，避免依赖外部图片链接。"""
+    if not BG_PATH.exists():
+        return
+    b64 = base64.b64encode(BG_PATH.read_bytes()).decode()
+    css = """
+<style>
+[data-testid="stAppViewContainer"] {
+    background-image: url("data:image/jpeg;base64,__B64__");
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+}
+[data-testid="stHeader"] {
+    background: transparent;
+}
+[data-testid="stSidebar"] {
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(10px);
+}
+.block-container {
+    background: rgba(255, 255, 255, 0.80);
+    backdrop-filter: blur(6px);
+    border-radius: 18px;
+    padding: 2rem 2.2rem;
+    margin-top: 1.5rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+}
+</style>
+""".replace("__B64__", b64)
+    st.markdown(css, unsafe_allow_html=True)
+
+
+inject_background()
 
 
 @st.cache_resource
