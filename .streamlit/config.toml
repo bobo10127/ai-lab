@@ -1,0 +1,14 @@
+[server]
+# 云端是 headless 环境，必须关掉自动开浏览器
+headless = true
+# 单次上传上限 20MB，够拍发票了
+maxUploadSize = 20
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+primaryColor = "#1F6F8B"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F0F6F8"
+textColor = "#1F2D33"

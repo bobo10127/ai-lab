@@ -16,9 +16,11 @@ import re
 from collections import Counter
 from pathlib import Path
 
-# 必须在导入 sentence_transformers 之前设置，模型才会从国内镜像下载、并缓存到 E 盘
+# 必须在导入 sentence_transformers 之前设置，模型才会从国内镜像下载。
+# HF_HOME 只在 Windows 本地指向 E 盘（C 盘空间紧张）；云端是 Linux，用默认缓存目录。
 os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
-os.environ.setdefault("HF_HOME", r"E:\hf-cache")
+if os.name == "nt":
+    os.environ.setdefault("HF_HOME", r"E:\hf-cache")
 
 from openai import OpenAI
 

@@ -1,7 +1,10 @@
+# 云端（Streamlit Community Cloud）依赖：只装跑得动的那部分。
+# 注意这里没有 sentence-transformers / torch —— 免费实例只有 1GB 内存，装不下。
+# 少了它 rag.py 会自动退回 TF-IDF 关键词检索，功能正常，只是不懂"换个说法"。
+# 想在本地要语义检索：pip install -r requirements-local.txt
 openai>=1.0
 python-dotenv>=1.0
 streamlit>=1.30
 rapidocr-onnxruntime>=1.3
-sentence-transformers>=3.0
 openpyxl>=3.1
 reportlab>=4.0

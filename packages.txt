@@ -1,0 +1,6 @@
+# Streamlit Cloud 每次部署会用 apt-get 装这里的系统包
+# 中文字体：PDF 导出要用（reportlab 需要 TrueType 字体文件）
+fonts-wqy-microhei
+# OpenCV 跑在无桌面环境里需要这两个，否则 import cv2 会报 libGL.so.1 找不到
+libgl1
+libglib2.0-0

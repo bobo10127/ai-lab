@@ -41,11 +41,28 @@ DEMO_TEXTS = [
 ]
 
 
+def _secret_api_key() -> str:
+    """线上把 key 放在 Streamlit 的 Secrets 里，本地才用 .env。
+
+    只有真的跑在 Streamlit 里才去读——命令行下读 secrets 会报「找不到」。
+    """
+    try:
+        from streamlit import secrets as st_secrets
+        from streamlit.runtime import exists as runtime_exists
+
+        if runtime_exists():
+            return str(st_secrets.get("DEEPSEEK_API_KEY", "") or "").strip()
+    except Exception:
+        pass
+    return ""
+
+
 def get_client() -> OpenAI:
-    api_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
+    api_key = _secret_api_key() or os.getenv("DEEPSEEK_API_KEY", "").strip()
     if not api_key:
-        print("缺少 DEEPSEEK_API_KEY，请先配置 .env")
-        raise SystemExit(1)
+        raise RuntimeError(
+            "缺少 DEEPSEEK_API_KEY：本地写进 .env，线上填到 Streamlit 的 Secrets。"
+        )
     return OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
 
 

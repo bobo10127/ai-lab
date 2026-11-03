@@ -34,12 +34,18 @@ python hello_ai.py
 
 ```text
 ai-lab/
+├── .streamlit/
+│   ├── config.toml        # 主题、上传上限、headless
+│   └── secrets.toml.example
 ├── assets/bg.jpg          # 界面背景（代码生成）
 ├── docs/报销制度.md        # RAG 用的虚构制度文档
 ├── .env.example           # 环境变量模板
 ├── .gitignore
 ├── README.md
-├── requirements.txt
+├── requirements.txt       # 云端依赖（不含 torch）
+├── requirements-local.txt # 本地额外依赖（语义检索）
+├── packages.txt           # 云端 apt 系统包（中文字体、libGL）
+├── runtime.txt            # Python 版本
 ├── demo_similarity.py     # 零依赖：余弦相似度演示
 ├── hello_ai.py            # 调用 DeepSeek 的最小示例
 ├── invoice_extractor.py   # 发票文本 -> 结构化 JSON + 规则校验
@@ -162,6 +168,53 @@ PDF 里的「合计」行原本用白色字压在浅色底上，几乎看不见�
 python make_background.py   # 重新生成 assets/bg.jpg
 ```
 
+## 部署上线（Streamlit Community Cloud）
+
+免费、和 GitHub 绑定，以后每次 push 会自动重新部署。
+
+**云端和本地有三处不一样，不是 bug：**
+
+| | 本地 | 云端 |
+|---|---|---|
+| 检索 | bge 语义检索 | TF-IDF 关键词检索 |
+| 中文字体 | Windows 自带雅黑 | `packages.txt` 装 wqy-microhei |
+| API Key | `.env` 文件 | 后台 Secrets |
+
+云端用 TF-IDF 的原因很实在：免费实例只有 **1GB 内存**，`torch` 一装就是两个多 G，导进来直接把实例撑爆。`rag.py` 会检测到 `sentence-transformers` 没装，自动退回关键词检索，功能照常，只是不懂「住个店能报多少」这种换说法的问法。
+
+**四个配置文件各干各的：**
+
+- `requirements.txt` —— Python 依赖，云端只装这些
+- `packages.txt` —— apt 系统包：中文字体（PDF 导出要用）、`libgl1`（不然 `import cv2` 直接报 `libGL.so.1` 找不到）
+- `runtime.txt` —— Python 版本
+- `.streamlit/config.toml` —— 主题色、上传上限、云端关掉自动开浏览器
+
+**部署步骤**
+
+1. 打开 https://share.streamlit.io ，用 GitHub 账号登录并授权
+2. New app → 选 `bobo10127/ai-lab` → branch `main` → Main file path `app.py`
+3. Advanced settings → Secrets 里填：
+   ```toml
+   DEEPSEEK_API_KEY = "sk-你的key"
+   ```
+   想加访问密码，再加一行 `APP_PASSWORD = "自己定一个"`（不设就是不设防，任何人都能刷你的额度）
+4. 点 Deploy，等 3～5 分钟装依赖
+5. 拿到 `https://xxx.streamlit.app`，按下面清单验一遍
+
+**上线后自检清单**
+
+- [ ] 文本提取 → 能出金额、类别、日期
+- [ ] 制度问答 → 答得出，且带 `[1]` 出处
+- [ ] 导出 PDF → **中文不是方块**（字体没配好就长这样，最容易翻车的一步）
+- [ ] 上传图片 → OCR 能认出字（`libgl1` 没装会直接崩）
+- [ ] 刷新页面，侧边栏剩余次数回到 30
+
+**省钱这件事**
+
+免费实例跑模型是花你自己的 DeepSeek 额度。所以做了两道闸：每次会话最多 30 次调用；可选密码门。上线后头几天去 DeepSeek 后台看一眼用量，不对劲就把 key 换了。
+
+另外免费实例闲置约 12 小时会休眠，别人隔天第一次打开要等十几秒唤醒，这很正常。
+
 ## 下一步
 
 - [x] 跑通 `demo_similarity.py`
@@ -172,4 +225,4 @@ python make_background.py   # 重新生成 assets/bg.jpg
 - [x] 做一个 RAG：报销制度问答
 - [x] 把检索升级成 embedding（语义检索）
 - [x] 支持 PDF / Excel 导出
-- [ ] 部署上线
+- [x] 部署上线

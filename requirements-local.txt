@@ -1,0 +1,9 @@
+# 本地额外依赖：语义检索。
+#
+# 装法：
+#     pip install -r requirements-local.txt
+#
+# 装上之后 rag.py 会自动用 bge-small-zh 做向量检索；
+# 不装或模型下载失败，会自动退回 TF-IDF，不会崩。
+-r requirements.txt
+sentence-transformers>=3.0

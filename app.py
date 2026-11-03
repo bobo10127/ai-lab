@@ -8,6 +8,7 @@
 
 import base64
 import json
+import os
 import tempfile
 from datetime import date
 from pathlib import Path
@@ -26,6 +27,9 @@ from invoice_extractor import (
 from rag import answer_question
 
 st.set_page_config(page_title="大肥鱼发票助手", page_icon="🐟", layout="centered")
+
+# 公开演示站：每次会话最多调几次模型，防止别人把你的额度刷掉
+MAX_CALLS = int(os.getenv("AI_LAB_MAX_CALLS", "30"))
 
 BG_PATH = Path(__file__).with_name("assets") / "bg.jpg"
 
@@ -64,6 +68,47 @@ def inject_background() -> None:
 
 
 inject_background()
+
+
+def get_secret(name: str, default: str = "") -> str:
+    """优先读 Streamlit Secrets（线上），读不到就回落到环境变量（本地）。"""
+    try:
+        value = st.secrets.get(name, "")
+        if value:
+            return str(value).strip()
+    except Exception:  # 没有 secrets.toml 时会抛，本地开发很正常
+        pass
+    return os.getenv(name, default).strip()
+
+
+def consume_call() -> bool:
+    """记一次模型调用；额度用完返回 False。"""
+    used = st.session_state.get("calls", 0)
+    if used >= MAX_CALLS:
+        return False
+    st.session_state["calls"] = used + 1
+    return True
+
+
+def quota_hint() -> None:
+    st.warning(
+        f"本次会话的 {MAX_CALLS} 次调用额度用完了。刷新页面可以重置——"
+        "公开演示站，额度有限，谢谢理解。"
+    )
+
+
+# 可选密码门：在 Secrets 里设了 APP_PASSWORD 才生效
+APP_PASSWORD = get_secret("APP_PASSWORD")
+if APP_PASSWORD and not st.session_state.get("authed"):
+    st.title("🐟 大肥鱼发票助手")
+    st.caption("演示站，先输访问密码")
+    pwd = st.text_input("访问密码", type="password")
+    if pwd and pwd == APP_PASSWORD:
+        st.session_state["authed"] = True
+        st.rerun()
+    elif pwd:
+        st.error("密码不对")
+    st.stop()
 
 
 @st.cache_resource
@@ -118,6 +163,10 @@ with st.sidebar:
     if st.button("填入一条示例", width="stretch"):
         st.session_state["invoice_text"] = DEMO_TEXTS[0]
 
+    st.divider()
+    left = max(MAX_CALLS - st.session_state.get("calls", 0), 0)
+    st.caption(f"本次会话还可调用 **{left}** 次（刷新页面重置）")
+
 tab_text, tab_image, tab_rag, tab_export = st.tabs(
     ["📝 文本输入", "🖼️ 上传图片", "📚 制度问答", "📊 汇总导出"]
 )
@@ -136,6 +185,8 @@ with tab_text:
     if st.button("提取", type="primary"):
         if not text.strip():
             st.warning("先粘贴一段发票文字。")
+        elif not consume_call():
+            quota_hint()
         else:
             with st.spinner("正在提取..."):
                 try:
@@ -154,6 +205,10 @@ with tab_image:
         st.image(uploaded, caption=uploaded.name, width="stretch")
 
         if st.button("识别并提取", type="primary"):
+            if not consume_call():
+                quota_hint()
+                st.stop()
+
             suffix = Path(uploaded.name).suffix or ".png"
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                 tmp.write(uploaded.getvalue())
@@ -181,6 +236,8 @@ with tab_rag:
     if st.button("提问", type="primary"):
         if not question.strip():
             st.warning("先输入一个问题。")
+        elif not consume_call():
+            quota_hint()
         else:
             with st.spinner("检索并回答中..."):
                 try:

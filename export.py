@@ -28,21 +28,30 @@ COLUMNS = [
     ("校验", 9),
 ]
 
-# 字体候选：微软雅黑 -> 黑体 -> 宋体。
-# reportlab 不能直接吃 .ttc 字体集合，要配合 subfontIndex 使用。
-FONT_DIR = Path(r"C:\Windows\Fonts")
-FONT_NORMAL = ["msyh.ttc", "simhei.ttf", "simsun.ttc"]
-FONT_BOLD = ["msyhbd.ttc", "msyh.ttc", "simhei.ttf", "simsun.ttc"]
+# 字体候选：(文件路径, TTC 子字体序号)，按顺序找第一个存在的。
+# Windows 用系统自带字体；Linux（Streamlit Cloud）靠 packages.txt 装 fonts-wqy-microhei。
+# 注意：NotoSansCJK 是 CFF 轮廓的 OTF，reportlab 读不了，别往这里加。
+FONT_CANDIDATES = [
+    (r"C:\Windows\Fonts\msyh.ttc", 0),
+    (r"C:\Windows\Fonts\simhei.ttf", 0),
+    (r"C:\Windows\Fonts\simsun.ttc", 0),
+    ("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc", 0),
+    ("/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc", 0),
+    ("/usr/share/fonts/truetype/arphic/uming.ttc", 0),
+]
+FONT_BOLD_CANDIDATES = [
+    (r"C:\Windows\Fonts\msyhbd.ttc", 0),
+    (r"C:\Windows\Fonts\msyh.ttc", 0),
+]
 
 _FONTS: tuple[str, str] | None = None
 
 
-def _pick_font(names: list[str]) -> str | None:
-    """返回第一个存在的字体文件路径。"""
-    for name in names:
-        p = FONT_DIR / name
-        if p.exists():
-            return str(p)
+def _find_font(candidates: list[tuple[str, int]]) -> tuple[str, int] | None:
+    """返回第一个存在的字体 (路径, 序号)。"""
+    for path, index in candidates:
+        if Path(path).exists():
+            return path, index
     return None
 
 
@@ -55,19 +64,31 @@ def _register_fonts() -> tuple[str, str]:
     if _FONTS is not None:
         return _FONTS
 
+    import os
+
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
 
-    normal_path = _pick_font(FONT_NORMAL)
-    if normal_path is None:
+    # 调试用：设 PDF_FONT=/path/to/font.ttf 可以强制指定字体
+    override = os.getenv("PDF_FONT", "").strip()
+    normal = (
+        (override, 0)
+        if override and Path(override).exists()
+        else _find_font(FONT_CANDIDATES)
+    )
+    if normal is None:
         raise RuntimeError(
-            "没找到中文字体（msyh.ttc / simhei.ttf / simsun.ttc），PDF 导出会乱码。"
+            "没找到中文字体，PDF 会变成方块。Windows 需要微软雅黑/黑体/宋体；"
+            "Linux 上装 fonts-wqy-microhei（Streamlit Cloud 写进 packages.txt）。"
         )
-    bold_path = _pick_font(FONT_BOLD) or normal_path
+    bold = _find_font(FONT_BOLD_CANDIDATES) or normal
 
     # 同一个文件不能重复注册同名，这里用两个不同的字体名
-    pdfmetrics.registerFont(TTFont("CJK", normal_path))
-    pdfmetrics.registerFont(TTFont("CJK-Bold", bold_path))
+    try:
+        pdfmetrics.registerFont(TTFont("CJK", normal[0], subfontIndex=normal[1]))
+        pdfmetrics.registerFont(TTFont("CJK-Bold", bold[0], subfontIndex=bold[1]))
+    except Exception as exc:
+        raise RuntimeError(f"中文字体注册失败（{normal[0]}）：{exc}") from exc
     pdfmetrics.registerFontFamily("CJK", normal="CJK", bold="CJK-Bold")
 
     _FONTS = ("CJK", "CJK-Bold")
